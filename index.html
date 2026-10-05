@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lions Team — Запись</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-color: var(--tg-theme-bg-color, #ffffff);
+      --text-color: var(--tg-theme-text-color, #222222);
+      --hint-color: var(--tg-theme-hint-color, #888888);
+      --btn-color: var(--tg-theme-button-color, #2481cc);
+      --btn-text-color: var(--tg-theme-button-text-color, #ffffff);
+      --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-color); padding: 16px; padding-bottom: 32px; }
+
+    .tabs { display: flex; margin-bottom: 16px; border-bottom: 2px solid var(--secondary-bg); }
+    .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab-btn.active { border-color: var(--btn-color); color: var(--btn-color); }
+
+    .card {
+      background-color: var(--secondary-bg);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    .card.selected { border-color: var(--btn-color); background-color: var(--bg-color); }
+    .card-title { font-weight: bold; font-size: 16px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .card-subtitle { font-size: 13px; color: var(--hint-color); margin-bottom: 8px; }
+
+    .card-badge { display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 6px; margin-right: 4px; }
+    .badge-age { background-color: #e3f2fd; color: #0d47a1; font-weight: bold; }
+    .badge-seats { background-color: #e8f5e9; color: #1b5e20; }
+    .badge-full { background-color: #ffebee; color: #c62828; }
+    .badge-status { background-color: #fff3e0; color: #e65100; font-weight: bold; }
+
+    .form-group { margin-top: 16px; }
+    label { display: block; font-size: 13px; color: var(--hint-color); margin-bottom: 6px; font-weight: 500; }
+    input {
+      width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc;
+      background-color: var(--bg-color); color: var(--text-color); font-size: 15px; margin-bottom: 12px; outline: none;
+    }
+    input:focus { border-color: var(--btn-color); }
+
+    .btn-submit {
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      background-color: var(--btn-color); color: var(--btn-text-color);
+      font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;
+    }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg { color: #d32f2f; font-size: 13px; margin-top: -8px; margin-bottom: 12px; display: none; }
+    .loading { text-align: center; padding: 30px; color: var(--hint-color); }
+  </style>
+</head>
+<body>
+
+  <!-- Вставьте ваш URL из Google Apps Script (Новое развертывание -> Веб-приложение) -->
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbyMNQe4A2dzc-kR2KKGA-lJjHOK4WGw8jUXwEao2NHp3OFZcDFUnmtcCxslFbq6sah2Ow/exec";
+  </script>
+
+  <div class="tabs">
+    <div class="tab-btn active" id="tabSchedule" onclick="switchTab('schedule')">📅 Записаться</div>
+    <div class="tab-btn" id="tabMyBookings" onclick="switchTab('myBookings')">🎟️ Мои записи</div>
+  </div>
+
+  <!-- Вкладка Расписание -->
+  <div id="sectionSchedule">
+    <div id="loading" class="loading">Загрузка расписания...</div>
+    <div id="slotsList"></div>
+
+    <div id="bookingForm" class="form-group" style="display: none;">
+      <h3 style="margin-bottom: 12px;">Заполнение данных</h3>
+      
+      <label for="clientName">ФИО Родителя / Клиента *</label>
+      <input type="text" id="clientName" placeholder="Иванов Иван" required>
+
+      <label for="clientPhone">Номер телефона *</label>
+      <input type="tel" id="clientPhone" placeholder="+7 (999) 000-00-00" required>
+
+      <label for="childName">ФИО ребёнка *</label>
+      <input type="text" id="childName" placeholder="Иванов Алексей" required>
+
+      <label for="childBirthYear">Год рождения ребёнка *</label>
+      <input type="number" id="childBirthYear" placeholder="2015" min="2000" max="2026" required>
+      <div id="ageError" class="error-msg"></div>
+
+      <button type="button" class="btn-submit" id="submitBtn" onclick="submitBooking()">Подтвердить запись</button>
+    </div>
+  </div>
+
+  <!-- Вкладка Мои записи -->
+  <div id="sectionMyBookings" style="display: none;">
+    <div id="myBookingsLoading" class="loading">Загрузка моих записей...</div>
+    <div id="myBookingsList"></div>
+  </div>
+
+  <script>
+    let tg = window.Telegram.WebApp;
+    let selectedSession = null;
+    let currentChatId = "";
+
+    document.addEventListener("DOMContentLoaded", function() {
+      tg.ready();
+      tg.expand();
+
+      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        const user = tg.initDataUnsafe.user;
+        currentChatId = String(user.id);
+        const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+        if (fullName) document.getElementById("clientName").value = fullName;
+      }
+
+      loadSchedule();
+    });
+
+    function switchTab(tab) {
+      document.getElementById("tabSchedule").classList.toggle("active", tab === 'schedule');
+      document.getElementById("tabMyBookings").classList.toggle("active", tab === 'myBookings');
+
+      document.getElementById("sectionSchedule").style.display = tab === 'schedule' ? 'block' : 'none';
+      document.getElementById("sectionMyBookings").style.display = tab === 'myBookings' ? 'block' : 'none';
+
+      if (tab === 'myBookings') {
+        loadMyBookings();
+      }
+    }
+
+    function loadSchedule() {
+      fetch(`${API_URL}?action=getSchedule`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("loading").style.display = "none";
+          if (data.status === "success" && data.sessions.length > 0) {
+            renderSchedule(data.sessions);
+          } else {
+            document.getElementById("loading").innerText = "На ближайшие дни нет доступных занятий.";
+          }
+        })
+        .catch(err => {
+          document.getElementById("loading").innerText = "Ошибка загрузки расписания.";
+        });
+    }
+
+    function renderSchedule(sessions) {
+      const container = document.getElementById("slotsList");
+      container.innerHTML = "";
+
+      sessions.forEach(session => {
+        const isFull = session.freeSeats <= 0;
+        const card = document.createElement("div");
+        card.className = `card ${isFull ? 'disabled' : ''}`;
+        
+        card.innerHTML = `
+          <div class="card-title">
+            <span>${session.title}</span>
+            <span>${session.price > 0 ? session.price + ' ₽' : 'Бесплатно'}</span>
+          </div>
+          <div class="card-subtitle">
+            📅 ${session.date} в ${session.time} (${session.duration})<br>
+            👨‍🏫 Тренер: ${session.coach} | 📍 ${session.location}
+          </div>
+          <div>
+            <span class="card-badge badge-age">Год рожд.: ${session.yearFrom}–${session.yearTo}</span>
+            <span class="card-badge ${isFull ? 'badge-full' : 'badge-seats'}">
+              ${isFull ? 'Мест нет' : 'Свободно: ' + session.freeSeats}
+            </span>
+          </div>
+        `;
+
+        if (!isFull) {
+          card.onclick = () => selectSlot(session, card);
+        } else {
+          card.style.opacity = "0.6";
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    function selectSlot(session, element) {
+      selectedSession = session;
+      document.querySelectorAll("#slotsList .card").forEach(c => c.classList.remove("selected"));
+      element.classList.add("selected");
+      document.getElementById("bookingForm").style.display = "block";
+    }
+
+    function submitBooking() {
+      const name = document.getElementById("clientName").value.trim();
+      const phone = document.getElementById("clientPhone").value.trim();
+      const childName = document.getElementById("childName").value.trim();
+      const childYear = parseInt(document.getElementById("childBirthYear").value);
+
+      if (!selectedSession || !name || !phone || !childName || isNaN(childYear)) {
+        alert("Заполните все обязательные поля.");
+        return;
+      }
+
+      if (childYear < selectedSession.yearFrom || childYear > selectedSession.yearTo) {
+        const ageError = document.getElementById("ageError");
+        ageError.innerText = `Допустимый возраст ребенка: ${selectedSession.yearFrom}–${selectedSession.yearTo} гг.р.`;
+        ageError.style.display = "block";
+        return;
+      }
+
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.innerText = "Отправка...";
+
+      const tgUser = tg.initDataUnsafe?.user || {};
+
+      const payload = {
+        action: "createBooking",
+        sessionId: selectedSession.id,
+        clientName: name,
+        clientPhone: phone,
+        childName: childName,
+        childBirthYear: childYear,
+        telegramUsername: tgUser.username ? `@${tgUser.username}` : "",
+        chatId: currentChatId
+      };
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "success") {
+          alert(`Вы успешно записаны! Номер вашей брони: ${res.bookingId}`);
+          switchTab('myBookings');
+        } else {
+          alert("Ошибка: " + res.message);
+          btn.disabled = false;
+          btn.innerText = "Подтвердить запись";
+        }
+      })
+      .catch(err => {
+        alert("Ошибка при сохранении.");
+        btn.disabled = false;
+        btn.innerText = "Подтвердить запись";
+      });
+    }
+
+    function loadMyBookings() {
+      const container = document.getElementById("myBookingsList");
+      const loading = document.getElementById("myBookingsLoading");
+      loading.style.display = "block";
+      container.innerHTML = "";
+
+      fetch(`${API_URL}?action=getUserBookings&chat_id=${currentChatId}`)
+        .then(res => res.json())
+        .then(data => {
+          loading.style.display = "none";
+          if (data.status === "success" && data.bookings.length > 0) {
+            data.bookings.forEach(b => {
+              const card = document.createElement("div");
+              card.className = "card";
+              card.innerHTML = `
+                <div class="card-title">
+                  <span>${b.section}</span>
+                  <span class="card-badge badge-status">${b.status}</span>
+                </div>
+                <div class="card-subtitle">
+                  📅 ${b.sessionDateTime}<br>
+                  👶 Ребёнок: ${b.childName} (${b.childBirthYear} г.р.)<br>
+                  💳 Оплата: ${b.paymentStatus}
+                </div>
+                <div style="font-size: 11px; color: var(--hint-color);">ID брони: ${b.bookingId}</div>
+              `;
+              container.appendChild(card);
+            });
+          } else {
+            loading.innerText = "У вас пока нет активных записей.";
+          }
+        });
+    }
+  </script>
+</body>
+</html>
