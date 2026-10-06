@@ -191,7 +191,6 @@
       tg.ready();
       tg.expand();
 
-      // Чтение данных пользователя из Telegram
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         currentChatId = String(user.id);
@@ -201,7 +200,6 @@
 
       loadSchedule(true);
 
-      // Опрос раз в 5 минут
       setInterval(() => {
         loadSchedule(false);
       }, 300000);
@@ -216,7 +214,6 @@
       setTimeout(() => { banner.style.display = "none"; }, 6000);
     }
 
-    // Переключение вкладок
     function switchTab(tab) {
       document.getElementById("tabSchedule").classList.toggle("active", tab === 'schedule');
       document.getElementById("tabMyBookings").classList.toggle("active", tab === 'myBookings');
@@ -232,7 +229,6 @@
       }
     }
 
-    // Загрузка расписания
     function loadSchedule(showLoader = true) {
       if (showLoader) document.getElementById("loadingSchedule").style.display = "block";
       fetch(`${API_URL}?action=getSchedule`)
@@ -289,7 +285,6 @@
         dayEl.onclick = () => {
           selectedScheduleDate = dateStr;
           
-          // Закрытие формы записи и сброс выбора при смене дня недели
           selectedSession = null;
           document.getElementById("bookingForm").style.display = "none";
 
@@ -304,7 +299,6 @@
 
     function changeWeek(offset) {
       currentWeekOffset += offset;
-      // При смещении недели сбрасываем выбранное занятие и закрываем форму
       selectedSession = null;
       document.getElementById("bookingForm").style.display = "none";
       renderWeekCalendar();
@@ -404,7 +398,6 @@
       document.getElementById("bookingForm").style.display = "block";
     }
 
-    // Выполнение логики бронирования
     function submitBooking() {
       const name = document.getElementById("clientName").value.trim();
       const phone = document.getElementById("clientPhone").value.trim();
@@ -456,7 +449,6 @@
           document.getElementById("childName").value = "";
           document.getElementById("childBirthYear").value = "";
 
-          // Вызов loadSchedule() после бронирования
           loadSchedule(false);
         } else {
           showBanner(`❌ Ошибка: ${res.message || 'Не удалось забронировать'}`, true);
@@ -470,7 +462,6 @@
         selectedSession = null;
         document.getElementById("bookingForm").style.display = "none";
         
-        // Гарантированный вызов обновления расписания
         loadSchedule(false);
         btn.disabled = false;
         btn.innerText = "Подтвердить запись";
@@ -581,7 +572,6 @@
       });
     }
 
-    // Функция отмены бронирования с последующим запуском loadMyBookings()
     function cancelBooking(bookingId) {
       if (!confirm("Вы уверены, что хотите отменить запись?")) return;
 
@@ -602,8 +592,6 @@
         
         if (res.status === "success") {
           showBanner("✅ Запись успешно отменена.");
-          
-          // Вызов loadMyBookings() и loadSchedule() после отмены
           loadMyBookings();
           loadSchedule(false);
         } else {
@@ -612,8 +600,6 @@
       })
       .catch(() => {
         showBanner("✅ Статус обновлен.");
-        
-        // Гарантированный вызов
         loadMyBookings();
         loadSchedule(false);
       });
