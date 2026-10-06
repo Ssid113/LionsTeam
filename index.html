@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Lions Team — Запись</title>
+  <title>Запись на тренировки</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -16,51 +16,79 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-color); padding: 16px; padding-bottom: 32px; }
+    body { background-color: var(--bg-color); color: var(--text-color); padding: 12px; padding-bottom: 32px; }
 
-    .tabs { display: flex; margin-bottom: 16px; border-bottom: 2px solid var(--secondary-bg); }
+    .tabs { display: flex; margin-bottom: 12px; border-bottom: 2px solid var(--secondary-bg); }
     .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; }
     .tab-btn.active { border-color: var(--btn-color); color: var(--btn-color); }
 
-    .card {
-      background-color: var(--secondary-bg);
-      border-radius: 12px;
-      padding: 14px;
-      margin-bottom: 12px;
-      border: 2px solid transparent;
-      cursor: pointer;
-    }
-    .card.selected { border-color: var(--btn-color); background-color: var(--bg-color); }
-    .card-title { font-weight: bold; font-size: 16px; margin-bottom: 4px; display: flex; justify-content: space-between; }
-    .card-subtitle { font-size: 13px; color: var(--hint-color); margin-bottom: 8px; }
+    /* Календари */
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; }
+    .calendar-nav { cursor: pointer; padding: 4px 12px; background: var(--secondary-bg); border-radius: 6px; }
 
-    .card-badge { display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 6px; margin-right: 4px; }
+    /* Недельный календарь */
+    .week-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
+    .week-day {
+      flex: 0 0 85px; background: var(--secondary-bg); border-radius: 8px; padding: 8px 6px; text-align: center; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.2s;
+    }
+    .week-day.selected { border-color: var(--btn-color); background: var(--bg-color); }
+    .week-day-name { font-size: 11px; color: var(--hint-color); text-transform: uppercase; }
+    .week-day-num { font-size: 16px; font-weight: bold; margin: 2px 0; }
+    .week-day-events { font-size: 9px; color: var(--btn-color); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Месячный календарь */
+    .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; text-align: center; }
+    .month-day-header { font-size: 11px; color: var(--hint-color); padding: 4px 0; font-weight: bold; }
+    .month-day {
+      background: var(--secondary-bg); border-radius: 8px; min-height: 48px; padding: 4px; cursor: pointer;
+      border: 2px solid transparent; position: relative; font-size: 13px; font-weight: 500;
+    }
+    .month-day.other-month { opacity: 0.3; }
+    .month-day.selected { border-color: var(--btn-color); background: var(--bg-color); }
+    .month-day.has-booking { background: #e3f2fd; }
+    .booking-badge {
+      position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+      background: var(--btn-color); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 4px; white-space: nowrap;
+    }
+
+    /* Карточки */
+    .card { background-color: var(--secondary-bg); border-radius: 12px; padding: 12px; margin-bottom: 10px; border: 2px solid transparent; }
+    .card.selected { border-color: var(--btn-color); background-color: var(--bg-color); }
+    .card-title { font-weight: bold; font-size: 15px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .card-subtitle { font-size: 13px; color: var(--hint-color); margin-bottom: 6px; }
+
+    .card-badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 6px; margin-right: 4px; }
     .badge-age { background-color: #e3f2fd; color: #0d47a1; font-weight: bold; }
     .badge-seats { background-color: #e8f5e9; color: #1b5e20; }
     .badge-full { background-color: #ffebee; color: #c62828; }
+    .badge-closed { background-color: #eee; color: #666; }
     .badge-status { background-color: #fff3e0; color: #e65100; font-weight: bold; }
 
-    .form-group { margin-top: 16px; }
-    label { display: block; font-size: 13px; color: var(--hint-color); margin-bottom: 6px; font-weight: 500; }
+    .btn-cancel {
+      width: 100%; padding: 8px; border: 1px solid #d32f2f; color: #d32f2f; background: transparent;
+      border-radius: 6px; font-weight: bold; margin-top: 8px; cursor: pointer;
+    }
+
+    .form-group { margin-top: 12px; }
+    label { display: block; font-size: 12px; color: var(--hint-color); margin-bottom: 4px; }
     input {
-      width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc;
-      background-color: var(--bg-color); color: var(--text-color); font-size: 15px; margin-bottom: 12px; outline: none;
+      width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc;
+      background-color: var(--bg-color); color: var(--text-color); font-size: 14px; margin-bottom: 10px; outline: none;
     }
     input:focus { border-color: var(--btn-color); }
 
     .btn-submit {
-      width: 100%; padding: 14px; border: none; border-radius: 10px;
-      background-color: var(--btn-color); color: var(--btn-text-color);
-      font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;
+      width: 100%; padding: 12px; border: none; border-radius: 10px;
+      background-color: var(--btn-color); color: var(--btn-text-color); font-size: 15px; font-weight: bold; cursor: pointer;
     }
-    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-    .error-msg { color: #d32f2f; font-size: 13px; margin-top: -8px; margin-bottom: 12px; display: none; }
-    .loading { text-align: center; padding: 30px; color: var(--hint-color); }
+    .btn-submit:disabled { opacity: 0.5; }
+    .loading { text-align: center; padding: 20px; color: var(--hint-color); }
   </style>
 </head>
 <body>
 
-  <!-- Вставьте ваш URL из Google Apps Script (Новое развертывание -> Веб-приложение) -->
+  <!-- Вставьте вашу ссылку на развернутый Web App Google Apps Script -->
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbyMNQe4A2dzc-kR2KKGA-lJjHOK4WGw8jUXwEao2NHp3OFZcDFUnmtcCxslFbq6sah2Ow/exec";
   </script>
@@ -72,24 +100,33 @@
 
   <!-- Вкладка Расписание -->
   <div id="sectionSchedule">
-    <div id="loading" class="loading">Загрузка расписания...</div>
+    <div class="calendar-header">
+      <span id="weekTitle">Расписание недели</span>
+      <div>
+        <span class="calendar-nav" onclick="changeWeek(-1)">←</span>
+        <span class="calendar-nav" onclick="changeWeek(1)">→</span>
+      </div>
+    </div>
+    
+    <div id="weekCalendar" class="week-grid"></div>
+
+    <div id="loadingSchedule" class="loading">Загрузка занятий...</div>
     <div id="slotsList"></div>
 
     <div id="bookingForm" class="form-group" style="display: none;">
-      <h3 style="margin-bottom: 12px;">Заполнение данных</h3>
+      <h3 style="margin-bottom: 8px; font-size: 16px;">Данные для записи</h3>
       
-      <label for="clientName">ФИО Родителя / Клиента *</label>
+      <label>ФИО Клиента / Родителя *</label>
       <input type="text" id="clientName" placeholder="Иванов Иван" required>
 
-      <label for="clientPhone">Номер телефона *</label>
+      <label>Номер телефона *</label>
       <input type="tel" id="clientPhone" placeholder="+7 (999) 000-00-00" required>
 
-      <label for="childName">ФИО ребёнка *</label>
+      <label>ФИО ребёнка *</label>
       <input type="text" id="childName" placeholder="Иванов Алексей" required>
 
-      <label for="childBirthYear">Год рождения ребёнка *</label>
+      <label>Год рождения ребёнка *</label>
       <input type="number" id="childBirthYear" placeholder="2015" min="2000" max="2026" required>
-      <div id="ageError" class="error-msg"></div>
 
       <button type="button" class="btn-submit" id="submitBtn" onclick="submitBooking()">Подтвердить запись</button>
     </div>
@@ -97,14 +134,32 @@
 
   <!-- Вкладка Мои записи -->
   <div id="sectionMyBookings" style="display: none;">
-    <div id="myBookingsLoading" class="loading">Загрузка моих записей...</div>
+    <div class="calendar-header">
+      <span id="monthTitle"></span>
+      <div>
+        <span class="calendar-nav" onclick="changeMonth(-1)">←</span>
+        <span class="calendar-nav" onclick="changeMonth(1)">→</span>
+      </div>
+    </div>
+
+    <div id="monthCalendar" class="month-grid"></div>
+
+    <div id="loadingMyBookings" class="loading">Загрузка ваших записей...</div>
     <div id="myBookingsList"></div>
   </div>
 
   <script>
     let tg = window.Telegram.WebApp;
+    let allSessions = [];
+    let myBookings = [];
     let selectedSession = null;
     let currentChatId = "";
+
+    let currentWeekOffset = 0;
+    let selectedScheduleDate = formatDate(new Date());
+
+    let currentMonthDate = new Date();
+    let selectedMyBookingDate = formatDate(new Date());
 
     document.addEventListener("DOMContentLoaded", function() {
       tg.ready();
@@ -132,49 +187,109 @@
       }
     }
 
+    // --- РАСПИСАНИЕ И НЕДЕЛЬНЫЙ КАЛЕНДАРЬ ---
     function loadSchedule() {
+      document.getElementById("loadingSchedule").style.display = "block";
       fetch(`${API_URL}?action=getSchedule`)
         .then(res => res.json())
         .then(data => {
-          document.getElementById("loading").style.display = "none";
-          if (data.status === "success" && data.sessions.length > 0) {
-            renderSchedule(data.sessions);
-          } else {
-            document.getElementById("loading").innerText = "На ближайшие дни нет доступных занятий.";
+          document.getElementById("loadingSchedule").style.display = "none";
+          if (data.status === "success") {
+            allSessions = data.sessions;
+            renderWeekCalendar();
+            renderScheduleForDate(selectedScheduleDate);
           }
-        })
-        .catch(err => {
-          document.getElementById("loading").innerText = "Ошибка загрузки расписания.";
         });
     }
 
-    function renderSchedule(sessions) {
+    function renderWeekCalendar() {
+      const calendar = document.getElementById("weekCalendar");
+      calendar.innerHTML = "";
+
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() + (currentWeekOffset * 7));
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        const dateStr = formatDate(d);
+
+        const daySessions = allSessions.filter(s => s.date === dateStr);
+        const dayEl = document.createElement("div");
+        dayEl.className = `week-day ${dateStr === selectedScheduleDate ? 'selected' : ''}`;
+        
+        let eventsHtml = "";
+        daySessions.slice(0, 2).forEach(s => {
+          eventsHtml += `<div class="week-day-events">${s.title} ${s.time}</div>`;
+        });
+        if (daySessions.length > 2) eventsHtml += `<div class="week-day-events">+${daySessions.length - 2} еще</div>`;
+
+        dayEl.innerHTML = `
+          <div class="week-day-name">${d.toLocaleDateString('ru-RU', { weekday: 'short' })}</div>
+          <div class="week-day-num">${d.getDate()}</div>
+          ${eventsHtml}
+        `;
+
+        dayEl.onclick = () => {
+          selectedScheduleDate = dateStr;
+          document.querySelectorAll(".week-day").forEach(el => el.classList.remove("selected"));
+          dayEl.classList.add("selected");
+          renderScheduleForDate(dateStr);
+        };
+
+        calendar.appendChild(dayEl);
+      }
+    }
+
+    function changeWeek(offset) {
+      currentWeekOffset += offset;
+      renderWeekCalendar();
+    }
+
+    function renderScheduleForDate(dateStr) {
       const container = document.getElementById("slotsList");
       container.innerHTML = "";
+      document.getElementById("bookingForm").style.display = "none";
+
+      const sessions = allSessions.filter(s => s.date === dateStr);
+
+      if (sessions.length === 0) {
+        container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) нет занятий.</div>`;
+        return;
+      }
 
       sessions.forEach(session => {
-        const isFull = session.freeSeats <= 0;
         const card = document.createElement("div");
-        card.className = `card ${isFull ? 'disabled' : ''}`;
-        
+        card.className = "card";
+
+        let badgeClass = "badge-seats";
+        let statusText = `Свободно: ${session.freeSeats}`;
+
+        if (session.status === "Запись закрыта" || session.isPast) {
+          badgeClass = "badge-closed";
+          statusText = "Запись закрыта";
+        } else if (session.status === "Мест нет" || session.freeSeats <= 0) {
+          badgeClass = "badge-full";
+          statusText = "Мест нет";
+        }
+
         card.innerHTML = `
           <div class="card-title">
             <span>${session.title}</span>
             <span>${session.price > 0 ? session.price + ' ₽' : 'Бесплатно'}</span>
           </div>
           <div class="card-subtitle">
-            📅 ${session.date} в ${session.time} (${session.duration})<br>
-            👨‍🏫 Тренер: ${session.coach} | 📍 ${session.location}
+            ⏰ ${session.time} (${session.duration}) | 👨‍🏫 ${session.coach}<br>
+            📍 ${session.location}
           </div>
           <div>
-            <span class="card-badge badge-age">Год рожд.: ${session.yearFrom}–${session.yearTo}</span>
-            <span class="card-badge ${isFull ? 'badge-full' : 'badge-seats'}">
-              ${isFull ? 'Мест нет' : 'Свободно: ' + session.freeSeats}
-            </span>
+            <span class="card-badge badge-age">${session.yearFrom}–${session.yearTo} гг.р.</span>
+            <span class="card-badge ${badgeClass}">${statusText}</span>
           </div>
         `;
 
-        if (!isFull) {
+        if (session.status === "Открыта запись" && !session.isPast && session.freeSeats > 0) {
           card.onclick = () => selectSlot(session, card);
         } else {
           card.style.opacity = "0.6";
@@ -198,88 +313,182 @@
       const childYear = parseInt(document.getElementById("childBirthYear").value);
 
       if (!selectedSession || !name || !phone || !childName || isNaN(childYear)) {
-        alert("Заполните все обязательные поля.");
+        alert("Заполните все поля.");
         return;
       }
 
       if (childYear < selectedSession.yearFrom || childYear > selectedSession.yearTo) {
-        const ageError = document.getElementById("ageError");
-        ageError.innerText = `Допустимый возраст ребенка: ${selectedSession.yearFrom}–${selectedSession.yearTo} гг.р.`;
-        ageError.style.display = "block";
+        alert(`Возраст ребенка должен быть от ${selectedSession.yearFrom} до ${selectedSession.yearTo} г.р.`);
         return;
       }
 
       const btn = document.getElementById("submitBtn");
       btn.disabled = true;
-      btn.innerText = "Отправка...";
+      btn.innerText = "Запись...";
 
       const tgUser = tg.initDataUnsafe?.user || {};
 
-      const payload = {
-        action: "createBooking",
-        sessionId: selectedSession.id,
-        clientName: name,
-        clientPhone: phone,
-        childName: childName,
-        childBirthYear: childYear,
-        telegramUsername: tgUser.username ? `@${tgUser.username}` : "",
-        chatId: currentChatId
-      };
-
       fetch(API_URL, {
         method: "POST",
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          action: "createBooking",
+          sessionId: selectedSession.id,
+          clientName: name,
+          clientPhone: phone,
+          childName: childName,
+          childBirthYear: childYear,
+          telegramUsername: tgUser.username ? `@${tgUser.username}` : "",
+          chatId: currentChatId
+        })
       })
       .then(res => res.json())
       .then(res => {
         if (res.status === "success") {
-          alert(`Вы успешно записаны! Номер вашей брони: ${res.bookingId}`);
+          alert(`Вы успешно записаны! Номер брони: ${res.bookingId}`);
+          loadSchedule();
           switchTab('myBookings');
         } else {
           alert("Ошибка: " + res.message);
-          btn.disabled = false;
-          btn.innerText = "Подтвердить запись";
         }
-      })
-      .catch(err => {
-        alert("Ошибка при сохранении.");
         btn.disabled = false;
         btn.innerText = "Подтвердить запись";
       });
     }
 
+    // --- МОИ ЗАПИСИ И МЕСЯЧНЫЙ КАЛЕНДАРЬ ---
     function loadMyBookings() {
-      const container = document.getElementById("myBookingsList");
-      const loading = document.getElementById("myBookingsLoading");
-      loading.style.display = "block";
-      container.innerHTML = "";
-
+      document.getElementById("loadingMyBookings").style.display = "block";
       fetch(`${API_URL}?action=getUserBookings&chat_id=${currentChatId}`)
         .then(res => res.json())
         .then(data => {
-          loading.style.display = "none";
-          if (data.status === "success" && data.bookings.length > 0) {
-            data.bookings.forEach(b => {
-              const card = document.createElement("div");
-              card.className = "card";
-              card.innerHTML = `
-                <div class="card-title">
-                  <span>${b.section}</span>
-                  <span class="card-badge badge-status">${b.status}</span>
-                </div>
-                <div class="card-subtitle">
-                  📅 ${b.sessionDateTime}<br>
-                  👶 Ребёнок: ${b.childName} (${b.childBirthYear} г.р.)<br>
-                  💳 Оплата: ${b.paymentStatus}
-                </div>
-                <div style="font-size: 11px; color: var(--hint-color);">ID брони: ${b.bookingId}</div>
-              `;
-              container.appendChild(card);
-            });
-          } else {
-            loading.innerText = "У вас пока нет активных записей.";
+          document.getElementById("loadingMyBookings").style.display = "none";
+          if (data.status === "success") {
+            myBookings = data.bookings;
+            renderMonthCalendar();
+            renderMyBookingsForDate(selectedMyBookingDate);
           }
         });
+    }
+
+    function renderMonthCalendar() {
+      const monthTitle = document.getElementById("monthTitle");
+      const calendar = document.getElementById("monthCalendar");
+      calendar.innerHTML = "";
+
+      const year = currentMonthDate.getFullYear();
+      const month = currentMonthDate.getMonth();
+
+      monthTitle.innerText = currentMonthDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+
+      const dayHeaders = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+      dayHeaders.forEach(h => {
+        calendar.innerHTML += `<div class="month-day-header">${h}</div>`;
+      });
+
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+
+      let startingDay = firstDay.getDay() - 1;
+      if (startingDay === -1) startingDay = 6;
+
+      // Пустые дни начала месяца
+      for (let i = 0; i < startingDay; i++) {
+        calendar.innerHTML += `<div class="month-day other-month"></div>`;
+      }
+
+      // Дни месяца
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const dateObj = new Date(year, month, day);
+        const dateStr = formatDate(dateObj);
+
+        const activeBookings = myBookings.filter(b => b.sessionDate === dateStr && b.status === "Забронировано");
+        const hasBooking = activeBookings.length > 0;
+
+        const dayEl = document.createElement("div");
+        dayEl.className = `month-day ${hasBooking ? 'has-booking' : ''} ${dateStr === selectedMyBookingDate ? 'selected' : ''}`;
+        
+        dayEl.innerHTML = `
+          <div>${day}</div>
+          ${hasBooking ? `<div class="booking-badge">${activeBookings.length} зап.</div>` : ''}
+        `;
+
+        dayEl.onclick = () => {
+          selectedMyBookingDate = dateStr;
+          document.querySelectorAll(".month-day").forEach(el => el.classList.remove("selected"));
+          dayEl.classList.add("selected");
+          renderMyBookingsForDate(dateStr);
+        };
+
+        calendar.appendChild(dayEl);
+      }
+    }
+
+    function changeMonth(offset) {
+      currentMonthDate.setMonth(currentMonthDate.getMonth() + offset);
+      renderMonthCalendar();
+    }
+
+    function renderMyBookingsForDate(dateStr) {
+      const container = document.getElementById("myBookingsList");
+      container.innerHTML = "";
+
+      const bookings = myBookings.filter(b => b.sessionDate === dateStr);
+
+      if (bookings.length === 0) {
+        container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) записей нет.</div>`;
+        return;
+      }
+
+      bookings.forEach(b => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        card.innerHTML = `
+          <div class="card-title">
+            <span>${b.section}</span>
+            <span class="card-badge badge-status">${b.status}</span>
+          </div>
+          <div class="card-subtitle">
+            ⏰ Время: ${b.sessionTime}<br>
+            👶 Ребёнок: ${b.childName} (${b.childBirthYear} г.р.)<br>
+            💳 Оплата: ${b.paymentStatus}
+          </div>
+          <div style="font-size: 11px; color: var(--hint-color);">№ брони: ${b.bookingId}</div>
+          ${b.canCancel ? `<button class="btn-cancel" onclick="cancelBooking('${b.bookingId}')">Отменить запись</button>` : ''}
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function cancelBooking(bookingId) {
+      if (!confirm("Вы уверены, что хотите отменить запись?")) return;
+
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "cancelBooking",
+          bookingId: bookingId,
+          chatId: currentChatId
+        })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.status === "success") {
+          alert("Запись успешно отменена.");
+          loadMyBookings();
+          loadSchedule();
+        } else {
+          alert("Ошибка отмены: " + res.message);
+        }
+      });
+    }
+
+    function formatDate(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
   </script>
 </body>
