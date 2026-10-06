@@ -21,11 +21,9 @@
     .tabs { display: flex; margin-bottom: 12px; border-bottom: 2px solid var(--secondary-bg); }
     .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; }
     .tab-btn.active { border-color: var(--btn-color); color: var(--btn-color); }
-
     /* Календари */
     .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; }
     .calendar-nav { cursor: pointer; padding: 4px 12px; background: var(--secondary-bg); border-radius: 6px; }
-
     /* Недельный календарь */
     .week-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
     .week-day {
@@ -36,7 +34,6 @@
     .week-day-name { font-size: 11px; color: var(--hint-color); text-transform: uppercase; }
     .week-day-num { font-size: 16px; font-weight: bold; margin: 2px 0; }
     .week-day-events { font-size: 9px; color: var(--btn-color); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
     /* Месячный календарь */
     .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; text-align: center; }
     .month-day-header { font-size: 11px; color: var(--hint-color); padding: 4px 0; font-weight: bold; }
@@ -51,7 +48,6 @@
       position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
       background: var(--btn-color); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 4px; white-space: nowrap;
     }
-
     /* Карточки */
     .card { background-color: var(--secondary-bg); border-radius: 12px; padding: 12px; margin-bottom: 10px; border: 2px solid transparent; }
     .card.selected { border-color: var(--btn-color); background-color: var(--bg-color); }
@@ -84,20 +80,25 @@
     }
     .btn-submit:disabled { opacity: 0.5; }
     .loading { text-align: center; padding: 20px; color: var(--hint-color); }
+    
+    .alert-banner {
+      padding: 10px; border-radius: 8px; background: #e8f5e9; color: #1b5e20;
+      font-size: 13px; font-weight: bold; margin-bottom: 12px; text-align: center; display: none;
+    }
   </style>
 </head>
 <body>
-
   <!-- Вставьте вашу ссылку на развернутый Web App Google Apps Script -->
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbyMNQe4A2dzc-kR2KKGA-lJjHOK4WGw8jUXwEao2NHp3OFZcDFUnmtcCxslFbq6sah2Ow/exec";
   </script>
 
+  <div id="statusBanner" class="alert-banner"></div>
+
   <div class="tabs">
     <div class="tab-btn active" id="tabSchedule" onclick="switchTab('schedule')">📅 Записаться</div>
     <div class="tab-btn" id="tabMyBookings" onclick="switchTab('myBookings')">🎟️ Мои записи</div>
   </div>
-
   <!-- Вкладка Расписание -->
   <div id="sectionSchedule">
     <div class="calendar-header">
@@ -131,7 +132,6 @@
       <button type="button" class="btn-submit" id="submitBtn" onclick="submitBooking()">Подтвердить запись</button>
     </div>
   </div>
-
   <!-- Вкладка Мои записи -->
   <div id="sectionMyBookings" style="display: none;">
     <div class="calendar-header">
@@ -172,8 +172,22 @@
         if (fullName) document.getElementById("clientName").value = fullName;
       }
 
-      loadSchedule();
+      loadSchedule(true);
+
+      // Автоматическое обновление данных каждые 15 секунд
+      setInterval(() => {
+        loadSchedule(false);
+      }, 15000);
     });
+
+    function showBanner(message, isError = false) {
+      const banner = document.getElementById("statusBanner");
+      banner.innerText = message;
+      banner.style.background = isError ? "#ffebee" : "#e8f5e9";
+      banner.style.color = isError ? "#c62828" : "#1b5e20";
+      banner.style.display = "block";
+      setTimeout(() => { banner.style.display = "none"; }, 5000);
+    }
 
     function switchTab(tab) {
       document.getElementById("tabSchedule").classList.toggle("active", tab === 'schedule');
@@ -186,10 +200,9 @@
         loadMyBookings();
       }
     }
-
     // --- РАСПИСАНИЕ И НЕДЕЛЬНЫЙ КАЛЕНДАРЬ ---
-    function loadSchedule() {
-      document.getElementById("loadingSchedule").style.display = "block";
+    function loadSchedule(showLoader = true) {
+      if (showLoader) document.getElementById("loadingSchedule").style.display = "block";
       fetch(`${API_URL}?action=getSchedule`)
         .then(res => res.json())
         .then(data => {
@@ -250,18 +263,21 @@
     function renderScheduleForDate(dateStr) {
       const container = document.getElementById("slotsList");
       container.innerHTML = "";
-      document.getElementById("bookingForm").style.display = "none";
 
       const sessions = allSessions.filter(s => s.date === dateStr);
 
       if (sessions.length === 0) {
         container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) нет занятий.</div>`;
+        document.getElementById("bookingForm").style.display = "none";
         return;
       }
 
       sessions.forEach(session => {
         const card = document.createElement("div");
         card.className = "card";
+        if (selectedSession && selectedSession.id === session.id) {
+          card.classList.add("selected");
+        }
 
         let badgeClass = "badge-seats";
         let statusText = `Свободно: ${session.freeSeats}`;
@@ -344,17 +360,30 @@
       .then(res => res.json())
       .then(res => {
         if (res.status === "success") {
-          alert(`Вы успешно записаны! Номер брони: ${res.bookingId}`);
-          loadSchedule();
-          switchTab('myBookings');
+          showBanner(`✅ Вы успешно записаны! Номер брони: ${res.bookingId}`);
+          if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+          
+          // Сброс выбора карточки для возможности повторной записи
+          selectedSession = null;
+          document.getElementById("bookingForm").style.display = "none";
+          document.getElementById("childName").value = "";
+          document.getElementById("childBirthYear").value = "";
+
+          // Мгновенно обновляем расписание
+          loadSchedule(false);
         } else {
-          alert("Ошибка: " + res.message);
+          showBanner(`❌ Ошибка: ${res.message}`, true);
+          loadSchedule(false);
         }
+        btn.disabled = false;
+        btn.innerText = "Подтвердить запись";
+      })
+      .catch(err => {
+        showBanner("❌ Ошибка сети при попытке записи.", true);
         btn.disabled = false;
         btn.innerText = "Подтвердить запись";
       });
     }
-
     // --- МОИ ЗАПИСИ И МЕСЯЧНЫЙ КАЛЕНДАРЬ ---
     function loadMyBookings() {
       document.getElementById("loadingMyBookings").style.display = "block";
@@ -391,12 +420,10 @@
       let startingDay = firstDay.getDay() - 1;
       if (startingDay === -1) startingDay = 6;
 
-      // Пустые дни начала месяца
       for (let i = 0; i < startingDay; i++) {
         calendar.innerHTML += `<div class="month-day other-month"></div>`;
       }
 
-      // Дни месяца
       for (let day = 1; day <= lastDay.getDate(); day++) {
         const dateObj = new Date(year, month, day);
         const dateStr = formatDate(dateObj);
@@ -475,11 +502,11 @@
       .then(res => res.json())
       .then(res => {
         if (res.status === "success") {
-          alert("Запись успешно отменена.");
+          showBanner("✅ Запись успешно отменена.");
           loadMyBookings();
-          loadSchedule();
+          loadSchedule(false);
         } else {
-          alert("Ошибка отмены: " + res.message);
+          showBanner(`❌ Ошибка отмены: ${res.message}`, true);
         }
       });
     }
