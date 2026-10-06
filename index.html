@@ -58,6 +58,29 @@
       background: var(--btn-color); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 4px; white-space: nowrap;
     }
 
+    /* Блок статистики */
+    .stats-card {
+      background: var(--secondary-bg);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+    .stats-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: var(--btn-color);
+      display: flex;
+      justify-content: space-between;
+    }
+    .stats-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px dashed rgba(0,0,0,0.08);
+    }
+    .stats-item:last-child { border-bottom: none; }
+
     /* Карточки занятий */
     .card { background-color: var(--secondary-bg); border-radius: 12px; padding: 12px; margin-bottom: 10px; border: 2px solid transparent; }
     .card.selected { border-color: var(--btn-color); background-color: var(--bg-color); }
@@ -170,6 +193,9 @@
 
     <div id="monthCalendar" class="month-grid"></div>
 
+    <!-- Краткая статистика за выбранный месяц -->
+    <div id="monthlyStats" class="stats-card" style="display: none;"></div>
+
     <div id="loadingMyBookings" class="loading">Загрузка ваших записей...</div>
     <div id="myBookingsList"></div>
   </div>
@@ -191,6 +217,7 @@
       tg.ready();
       tg.expand();
 
+      // Чтение данных пользователя из Telegram
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         currentChatId = String(user.id);
@@ -468,7 +495,7 @@
       });
     }
 
-    // --- МОИ ЗАПИСИ И МЕСЯЧНЫЙ КАЛЕНДАРЬ ---
+    // --- МОИ ЗАПИСИ, МЕСЯЧНЫЙ КАЛЕНДАРЬ И СТАТИСТИКА ---
     function loadMyBookings() {
       document.getElementById("loadingMyBookings").style.display = "block";
       fetch(`${API_URL}?action=getUserBookings&chat_id=${currentChatId}`)
@@ -478,6 +505,7 @@
           if (data.status === "success") {
             myBookings = data.bookings;
             renderMonthCalendar();
+            renderMonthlyStats();
             renderMyBookingsForDate(selectedMyBookingDate);
           }
         });
@@ -534,11 +562,69 @@
       }
     }
 
+    // Расчет краткой статистики за месяц по секциям
+    function renderMonthlyStats() {
+      const statsContainer = document.getElementById("monthlyStats");
+      const year = currentMonthDate.getFullYear();
+      const month = currentMonthDate.getMonth();
+
+      // Фильтруем активные бронирования текущего месяца
+      const monthBookings = myBookings.filter(b => {
+        if (b.status === "Отменено") return false;
+        const d = new Date(b.sessionDate);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+
+      if (monthBookings.length === 0) {
+        statsContainer.style.display = "none";
+        return;
+      }
+
+      // Группировка по названию секции
+      const statsMap = {};
+      let totalSum = 0;
+      let totalCount = 0;
+
+      monthBookings.forEach(b => {
+        const sec = b.section || "Тренировка";
+        const price = Number(b.price) || 1500;
+        
+        if (!statsMap[sec]) {
+          statsMap[sec] = { count: 0, sum: 0 };
+        }
+        statsMap[sec].count += 1;
+        statsMap[sec].sum += price;
+        totalSum += price;
+        totalCount += 1;
+      });
+
+      const monthName = currentMonthDate.toLocaleDateString('ru-RU', { month: 'long' });
+      let html = `<div class="stats-title">
+                    <span>📊 Статистика за ${monthName}</span>
+                    <span>Всего: ${totalSum.toLocaleString('ru-RU')} ₽</span>
+                  </div>`;
+
+      for (let sec in statsMap) {
+        const wordLessons = getPluralForm(statsMap[sec].count, 'занятие', 'занятия', 'занятий');
+        html += `
+          <div class="stats-item">
+            <span><strong>${sec}</strong> — ${statsMap[sec].count} ${wordLessons}</span>
+            <span>${statsMap[sec].sum.toLocaleString('ru-RU')} ₽</span>
+          </div>
+        `;
+      }
+
+      statsContainer.innerHTML = html;
+      statsContainer.style.display = "block";
+    }
+
     function changeMonth(offset) {
       currentMonthDate.setMonth(currentMonthDate.getMonth() + offset);
       renderMonthCalendar();
+      renderMonthlyStats();
     }
 
+    // Отображение "Моих записей" с сортировкой по времени
     function renderMyBookingsForDate(dateStr) {
       const container = document.getElementById("myBookingsList");
       container.innerHTML = "";
@@ -549,6 +635,9 @@
         container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) записей нет.</div>`;
         return;
       }
+
+      // Сортировка записей по времени (от ранних к поздним)
+      bookings.sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
 
       bookings.forEach(b => {
         const card = document.createElement("div");
@@ -610,6 +699,15 @@
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
+    }
+
+    function getPluralForm(n, one, two, many) {
+      let num = Math.abs(n) % 100;
+      let n1 = num % 10;
+      if (num > 10 && num < 20) return many;
+      if (n1 > 1 && n1 < 5) return two;
+      if (n1 == 1) return one;
+      return many;
     }
   </script>
 </body>
