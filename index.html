@@ -102,7 +102,7 @@
     .btn-submit:disabled { opacity: 0.5; }
     .loading { text-align: center; padding: 20px; color: var(--hint-color); }
     
-    /* Уведомление плашка */
+    /* Уведомления */
     .alert-banner {
       padding: 10px; border-radius: 8px; background: #e8f5e9; color: #1b5e20;
       font-size: 13px; font-weight: bold; margin-bottom: 12px; text-align: center; display: none;
@@ -369,7 +369,7 @@
             📍 ${session.location}
           </div>
           <div>
-            <span class="card-badge badge-age">${session.yearFrom}–${session.yearTo} гг.р.</span>
+            <span class="card-badge badge-age">${session.yearFrom}–${session.yearTo} г.р.</span>
             <span class="card-badge ${badgeClass}">${statusText}</span>
           </div>
           ${participantsHtml}
@@ -456,7 +456,7 @@
           document.getElementById("childName").value = "";
           document.getElementById("childBirthYear").value = "";
 
-          // Обновление расписания после бронирования
+          // Вызов loadSchedule() после бронирования
           loadSchedule(false);
         } else {
           showBanner(`❌ Ошибка: ${res.message || 'Не удалось забронировать'}`, true);
@@ -470,7 +470,7 @@
         selectedSession = null;
         document.getElementById("bookingForm").style.display = "none";
         
-        // Гарантированное вызов логики обновления расписания
+        // Гарантированный вызов обновления расписания
         loadSchedule(false);
         btn.disabled = false;
         btn.innerText = "Подтвердить запись";
@@ -603,7 +603,7 @@
         if (res.status === "success") {
           showBanner("✅ Запись успешно отменена.");
           
-          // Вызов обновления списка моих записей и расписания
+          // Вызов loadMyBookings() и loadSchedule() после отмены
           loadMyBookings();
           loadSchedule(false);
         } else {
@@ -613,7 +613,7 @@
       .catch(() => {
         showBanner("✅ Статус обновлен.");
         
-        // Гарантированный вызов обновления
+        // Гарантированный вызов
         loadMyBookings();
         loadSchedule(false);
       });
