@@ -27,7 +27,7 @@
     .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; }
     .calendar-nav { cursor: pointer; padding: 6px 16px; background: var(--secondary-bg); border-radius: 6px; font-size: 16px; user-select: none; }
 
-    /* Недельный календарь — Сетка в 4 колонки (без бокового скролла) */
+    /* Недельный календарь — Сетка в 4 колонки */
     .week-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -191,7 +191,7 @@
       tg.ready();
       tg.expand();
 
-      // Автоматическое получение Telegram Chat ID и имени пользователя
+      // Чтение данных пользователя из Telegram
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         currentChatId = String(user.id);
@@ -201,7 +201,7 @@
 
       loadSchedule(true);
 
-      // Автоматический опрос расписания раз в 5 минут (300 000 мс)
+      // Опрос раз в 5 минут
       setInterval(() => {
         loadSchedule(false);
       }, 300000);
@@ -216,7 +216,7 @@
       setTimeout(() => { banner.style.display = "none"; }, 6000);
     }
 
-    // Переключение вкладок с АВТОМАТИЧЕСКИМ ОБНОВЛЕНИЕМ ДАННЫХ
+    // Переключение вкладок
     function switchTab(tab) {
       document.getElementById("tabSchedule").classList.toggle("active", tab === 'schedule');
       document.getElementById("tabMyBookings").classList.toggle("active", tab === 'myBookings');
@@ -232,7 +232,7 @@
       }
     }
 
-    // --- РАСПИСАНИЕ И НЕДЕЛЬНЫЙ КАЛЕНДАРЬ ---
+    // Загрузка расписания
     function loadSchedule(showLoader = true) {
       if (showLoader) document.getElementById("loadingSchedule").style.display = "block";
       fetch(`${API_URL}?action=getSchedule`)
@@ -250,17 +250,15 @@
         });
     }
 
-    // Расчет Понедельника целевой недели
     function getMonday(d, weekOffset = 0) {
       const date = new Date(d);
-      const day = date.getDay(); // 0 - Вск, 1 - Пн, ... 6 - Суб
+      const day = date.getDay();
       const diff = date.getDate() - day + (day === 0 ? -6 : 1);
       const monday = new Date(date.setDate(diff));
       monday.setDate(monday.getDate() + (weekOffset * 7));
       return monday;
     }
 
-    // Отображение недели строго с Понедельника по Воскресенье
     function renderWeekCalendar() {
       const calendar = document.getElementById("weekCalendar");
       calendar.innerHTML = "";
@@ -290,6 +288,11 @@
 
         dayEl.onclick = () => {
           selectedScheduleDate = dateStr;
+          
+          // Закрытие формы записи и сброс выбора при смене дня недели
+          selectedSession = null;
+          document.getElementById("bookingForm").style.display = "none";
+
           document.querySelectorAll(".week-day").forEach(el => el.classList.remove("selected"));
           dayEl.classList.add("selected");
           renderScheduleForDate(dateStr);
@@ -301,10 +304,12 @@
 
     function changeWeek(offset) {
       currentWeekOffset += offset;
+      // При смещении недели сбрасываем выбранное занятие и закрываем форму
+      selectedSession = null;
+      document.getElementById("bookingForm").style.display = "none";
       renderWeekCalendar();
     }
 
-    // Отображение карточек занятий на выбранную дату
     function renderScheduleForDate(dateStr) {
       const container = document.getElementById("slotsList");
       container.innerHTML = "";
@@ -335,7 +340,7 @@
           statusText = "Мест нет";
         }
 
-        // Формирование списка записавшихся детей
+        // Список детей
         let participantsHtml = "";
         if (session.participants && session.participants.length > 0) {
           let items = session.participants.map(p => 
@@ -399,7 +404,7 @@
       document.getElementById("bookingForm").style.display = "block";
     }
 
-    // Безопасная отправка формы бронирования без ошибочного срабатывания Catch
+    // Выполнение логики бронирования
     function submitBooking() {
       const name = document.getElementById("clientName").value.trim();
       const phone = document.getElementById("clientPhone").value.trim();
@@ -440,11 +445,7 @@
       .then(res => res.text())
       .then(textData => {
         let res;
-        try {
-          res = JSON.parse(textData);
-        } catch(e) {
-          res = { status: "success", bookingId: "Бронь создана" };
-        }
+        try { res = JSON.parse(textData); } catch(e) { res = { status: "success" }; }
 
         if (res.status === "success") {
           showBanner(`✅ Вы успешно записаны! Номер брони: ${res.bookingId || 'Успешно'}`);
@@ -455,6 +456,7 @@
           document.getElementById("childName").value = "";
           document.getElementById("childBirthYear").value = "";
 
+          // Обновление расписания после бронирования
           loadSchedule(false);
         } else {
           showBanner(`❌ Ошибка: ${res.message || 'Не удалось забронировать'}`, true);
@@ -463,11 +465,12 @@
         btn.disabled = false;
         btn.innerText = "Подтвердить запись";
       })
-      .catch(err => {
-        // Защита: если запись фактически создалась, но fetch выбросил сетевой сбой из-за редиректа
+      .catch(() => {
         showBanner("✅ Заявка отправлена! Проверьте раздел «Мои записи».");
         selectedSession = null;
         document.getElementById("bookingForm").style.display = "none";
+        
+        // Гарантированное вызов логики обновления расписания
         loadSchedule(false);
         btn.disabled = false;
         btn.innerText = "Подтвердить запись";
@@ -578,6 +581,7 @@
       });
     }
 
+    // Функция отмены бронирования с последующим запуском loadMyBookings()
     function cancelBooking(bookingId) {
       if (!confirm("Вы уверены, что хотите отменить запись?")) return;
 
@@ -598,6 +602,8 @@
         
         if (res.status === "success") {
           showBanner("✅ Запись успешно отменена.");
+          
+          // Вызов обновления списка моих записей и расписания
           loadMyBookings();
           loadSchedule(false);
         } else {
@@ -606,6 +612,8 @@
       })
       .catch(() => {
         showBanner("✅ Статус обновлен.");
+        
+        // Гарантированный вызов обновления
         loadMyBookings();
         loadSchedule(false);
       });
