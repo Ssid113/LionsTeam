@@ -27,7 +27,7 @@
     .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; }
     .calendar-nav { cursor: pointer; padding: 6px 16px; background: var(--secondary-bg); border-radius: 6px; font-size: 16px; user-select: none; }
 
-    /* Фильтр по году рождения */
+    /* Фильтры и поиск */
     .filter-container {
       background: var(--secondary-bg);
       padding: 8px 12px;
@@ -51,6 +51,31 @@
       color: var(--text-color);
       font-size: 13px;
       outline: none;
+    }
+
+    /* Блок поиска броней по телефону */
+    .search-box {
+      background: var(--secondary-bg);
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .search-box input {
+      flex: 1;
+      margin-bottom: 0;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .search-box button {
+      padding: 8px 14px;
+      background: var(--btn-color);
+      color: var(--btn-text-color);
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
     }
 
     /* Недельный календарь */
@@ -225,6 +250,12 @@
 
   <!-- Раздел: Мои записи -->
   <div id="sectionMyBookings" style="display: none;">
+    <!-- Блок поиска записей по телефону (Полезно для обычной веб-ссылки) -->
+    <div class="search-box">
+      <input type="tel" id="searchPhoneInput" placeholder="Номер телефона (+7...)" />
+      <button onclick="searchBookingsByPhone()">Найти</button>
+    </div>
+
     <div class="calendar-header">
       <span id="monthTitle"></span>
       <div>
@@ -243,11 +274,14 @@
   </div>
 
   <script>
-    let tg = window.Telegram.WebApp;
+    let tg = window.Telegram?.WebApp;
+    let isTelegram = false;
+
     let allSessions = [];
     let myBookings = [];
     let selectedSession = null;
     let currentChatId = "";
+    let userPhone = "";
     let selectedBirthYearFilter = "";
 
     let currentWeekOffset = 0;
@@ -257,18 +291,10 @@
     let selectedMyBookingDate = formatDate(new Date());
 
     document.addEventListener("DOMContentLoaded", function() {
-      tg.ready();
-      tg.expand();
+      // Инициализация окружения (Telegram vs Веб-браузер)
+      initEnvironment();
 
-      // Заполнение вариантов выпадающего списка фильтра по годам (от 2000 до 2026)
       initYearFilterOptions();
-
-      if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        const user = tg.initDataUnsafe.user;
-        currentChatId = String(user.id);
-        const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ");
-        if (fullName) document.getElementById("clientName").value = fullName;
-      }
 
       loadSchedule(true);
 
@@ -277,7 +303,37 @@
       }, 300000);
     });
 
-    // Инициализация вариантов опций в фильтре
+    // Определяем режим захода: из Telegram или через обычный браузер
+    function initEnvironment() {
+      if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        isTelegram = true;
+        tg.ready();
+        tg.expand();
+        const user = tg.initDataUnsafe.user;
+        currentChatId = String(user.id);
+        const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+        if (fullName) document.getElementById("clientName").value = fullName;
+      } else {
+        isTelegram = false;
+        // Загрузка сохранённого веб-клиента из браузера
+        currentChatId = localStorage.getItem("web_chat_id") || "";
+        userPhone = localStorage.getItem("user_phone") || "";
+
+        if (!currentChatId) {
+          currentChatId = "WEB_" + Math.floor(100000 + Math.random() * 900000);
+          localStorage.setItem("web_chat_id", currentChatId);
+        }
+
+        if (userPhone) {
+          document.getElementById("searchPhoneInput").value = userPhone;
+          document.getElementById("clientPhone").value = userPhone;
+        }
+
+        const savedName = localStorage.getItem("user_client_name");
+        if (savedName) document.getElementById("clientName").value = savedName;
+      }
+    }
+
     function initYearFilterOptions() {
       const select = document.getElementById("birthYearFilter");
       for (let y = 2026; y >= 2000; y--) {
@@ -290,7 +346,6 @@
 
     function applyYearFilter() {
       selectedBirthYearFilter = document.getElementById("birthYearFilter").value;
-      // При смене фильтра сбрасываем открытую форму
       selectedSession = null;
       document.getElementById("bookingForm").style.display = "none";
       renderScheduleForDate(selectedScheduleDate);
@@ -357,7 +412,6 @@
         d.setDate(monday.getDate() + i);
         const dateStr = formatDate(d);
 
-        // При подсчёте занятий в недельном календаре учитываем фильтр
         const daySessions = allSessions.filter(s => {
           if (s.date !== dateStr) return false;
           if (selectedBirthYearFilter !== "") {
@@ -384,7 +438,6 @@
 
         dayEl.onclick = () => {
           selectedScheduleDate = dateStr;
-          
           selectedSession = null;
           document.getElementById("bookingForm").style.display = "none";
 
@@ -404,12 +457,10 @@
       renderWeekCalendar();
     }
 
-    // Отображение занятий на дату с фильтрацией по году рождения ребёнка
     function renderScheduleForDate(dateStr) {
       const container = document.getElementById("slotsList");
       container.innerHTML = "";
 
-      // Фильтрация по дате и выбранному году рождения
       const sessions = allSessions
         .filter(s => {
           if (s.date !== dateStr) return false;
@@ -508,7 +559,6 @@
       element.classList.add("selected");
       document.getElementById("bookingForm").style.display = "block";
 
-      // Если фильтр года уже был выбран, подставляем его в форму
       if (selectedBirthYearFilter && !document.getElementById("childBirthYear").value) {
         document.getElementById("childBirthYear").value = selectedBirthYearFilter;
       }
@@ -534,7 +584,14 @@
       btn.disabled = true;
       btn.innerText = "Запись...";
 
-      const tgUser = tg.initDataUnsafe?.user || {};
+      // Сохраняем в localStorage для веб-пользователей
+      if (!isTelegram) {
+        localStorage.setItem("user_phone", phone);
+        localStorage.setItem("user_client_name", name);
+        userPhone = phone;
+      }
+
+      const tgUser = (isTelegram && tg.initDataUnsafe) ? (tg.initDataUnsafe.user || {}) : {};
 
       fetch(API_URL, {
         method: "POST",
@@ -547,7 +604,7 @@
           clientPhone: phone,
           childName: childName,
           childBirthYear: childYear,
-          telegramUsername: tgUser.username ? `@${tgUser.username}` : "",
+          telegramUsername: tgUser.username ? `@${tgUser.username}` : "Web User",
           chatId: currentChatId
         })
       })
@@ -558,7 +615,7 @@
 
         if (res.status === "success") {
           showBanner(`✅ Вы успешно записаны! Номер брони: ${res.bookingId || 'Успешно'}`);
-          if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+          if (isTelegram && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
           
           selectedSession = null;
           document.getElementById("bookingForm").style.display = "none";
@@ -583,10 +640,13 @@
       });
     }
 
-    // --- МОИ ЗАПИСИ, МЕСЯЧНЫЙ КАЛЕНДАРЬ И СТАТИСТИКА ---
+    // --- МОИ ЗАПИСИ И СТАТИСТИКА ---
     function loadMyBookings() {
       document.getElementById("loadingMyBookings").style.display = "block";
-      fetch(`${API_URL}?action=getUserBookings&chat_id=${currentChatId}`)
+      
+      const searchUrl = `${API_URL}?action=getUserBookings&chat_id=${encodeURIComponent(currentChatId)}&phone=${encodeURIComponent(userPhone)}`;
+
+      fetch(searchUrl)
         .then(res => res.json())
         .then(data => {
           document.getElementById("loadingMyBookings").style.display = "none";
@@ -597,6 +657,17 @@
             renderMyBookingsForDate(selectedMyBookingDate);
           }
         });
+    }
+
+    function searchBookingsByPhone() {
+      const input = document.getElementById("searchPhoneInput").value.trim();
+      if (!input) {
+        alert("Введите номер телефона.");
+        return;
+      }
+      userPhone = input;
+      localStorage.setItem("user_phone", userPhone);
+      loadMyBookings();
     }
 
     function renderMonthCalendar() {
@@ -766,7 +837,8 @@
         body: JSON.stringify({
           action: "cancelBooking",
           bookingId: bookingId,
-          chatId: currentChatId
+          chatId: currentChatId,
+          phone: userPhone
         })
       })
       .then(res => res.text())
