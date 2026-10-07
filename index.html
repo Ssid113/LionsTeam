@@ -27,7 +27,7 @@
     .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold; }
     .calendar-nav { cursor: pointer; padding: 6px 16px; background: var(--secondary-bg); border-radius: 6px; font-size: 16px; user-select: none; }
 
-    /* Недельный календарь — Сетка в 4 колонки */
+    /* Недельный календарь */
     .week-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -73,6 +73,15 @@
       display: flex;
       justify-content: space-between;
     }
+    .stats-unpaid {
+      color: #c62828;
+      font-weight: bold;
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(0,0,0,0.12);
+      display: flex;
+      justify-content: space-between;
+    }
     .stats-item {
       display: flex;
       justify-content: space-between;
@@ -95,7 +104,7 @@
     .badge-closed { background-color: #eee; color: #666; }
     .badge-status { background-color: #fff3e0; color: #e65100; font-weight: bold; }
 
-    /* Список участников (детей) */
+    /* Список участников */
     .participants-toggle {
       font-size: 12px; color: var(--btn-color); font-weight: bold; margin-top: 8px; cursor: pointer; display: inline-block;
     }
@@ -125,7 +134,6 @@
     .btn-submit:disabled { opacity: 0.5; }
     .loading { text-align: center; padding: 20px; color: var(--hint-color); }
     
-    /* Уведомления */
     .alert-banner {
       padding: 10px; border-radius: 8px; background: #e8f5e9; color: #1b5e20;
       font-size: 13px; font-weight: bold; margin-bottom: 12px; text-align: center; display: none;
@@ -193,7 +201,7 @@
 
     <div id="monthCalendar" class="month-grid"></div>
 
-    <!-- Краткая статистика за выбранный месяц -->
+    <!-- Краткая статистика за месяц -->
     <div id="monthlyStats" class="stats-card" style="display: none;"></div>
 
     <div id="loadingMyBookings" class="loading">Загрузка ваших записей...</div>
@@ -217,7 +225,6 @@
       tg.ready();
       tg.expand();
 
-      // Чтение данных пользователя из Telegram
       if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
         const user = tg.initDataUnsafe.user;
         currentChatId = String(user.id);
@@ -331,11 +338,15 @@
       renderWeekCalendar();
     }
 
+    // Отображение занятий на дату со встроенной сортировкой по времени
     function renderScheduleForDate(dateStr) {
       const container = document.getElementById("slotsList");
       container.innerHTML = "";
 
-      const sessions = allSessions.filter(s => s.date === dateStr);
+      // Фильтрация и сортировка занятий по времени
+      const sessions = allSessions
+        .filter(s => s.date === dateStr)
+        .sort((a, b) => a.time.localeCompare(b.time));
 
       if (sessions.length === 0) {
         container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) нет доступных занятий.</div>`;
@@ -361,7 +372,6 @@
           statusText = "Мест нет";
         }
 
-        // Список детей
         let participantsHtml = "";
         if (session.participants && session.participants.length > 0) {
           let items = session.participants.map(p => 
@@ -562,13 +572,12 @@
       }
     }
 
-    // Расчет краткой статистики за месяц по секциям
+    // Расчет статистики за месяц с разделением суммы "Не оплачено"
     function renderMonthlyStats() {
       const statsContainer = document.getElementById("monthlyStats");
       const year = currentMonthDate.getFullYear();
       const month = currentMonthDate.getMonth();
 
-      // Фильтруем активные бронирования текущего месяца
       const monthBookings = myBookings.filter(b => {
         if (b.status === "Отменено") return false;
         const d = new Date(b.sessionDate);
@@ -580,10 +589,9 @@
         return;
       }
 
-      // Группировка по названию секции
       const statsMap = {};
       let totalSum = 0;
-      let totalCount = 0;
+      let unpaidSum = 0;
 
       monthBookings.forEach(b => {
         const sec = b.section || "Тренировка";
@@ -595,7 +603,10 @@
         statsMap[sec].count += 1;
         statsMap[sec].sum += price;
         totalSum += price;
-        totalCount += 1;
+
+        if (b.paymentStatus === "Не оплачено") {
+          unpaidSum += price;
+        }
       });
 
       const monthName = currentMonthDate.toLocaleDateString('ru-RU', { month: 'long' });
@@ -614,6 +625,15 @@
         `;
       }
 
+      if (unpaidSum > 0) {
+        html += `
+          <div class="stats-unpaid">
+            <span>К оплате (не оплачено):</span>
+            <span>${unpaidSum.toLocaleString('ru-RU')} ₽</span>
+          </div>
+        `;
+      }
+
       statsContainer.innerHTML = html;
       statsContainer.style.display = "block";
     }
@@ -624,20 +644,18 @@
       renderMonthlyStats();
     }
 
-    // Отображение "Моих записей" с сортировкой по времени
     function renderMyBookingsForDate(dateStr) {
       const container = document.getElementById("myBookingsList");
       container.innerHTML = "";
 
-      const bookings = myBookings.filter(b => b.sessionDate === dateStr);
+      const bookings = myBookings
+        .filter(b => b.sessionDate === dateStr)
+        .sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
 
       if (bookings.length === 0) {
         container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) записей нет.</div>`;
         return;
       }
-
-      // Сортировка записей по времени (от ранних к поздним)
-      bookings.sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
 
       bookings.forEach(b => {
         const card = document.createElement("div");
