@@ -1009,50 +1009,58 @@
  }
 
  function renderMyBookingsForDate(dateStr) {
- const container = document.getElementById("myBookingsList");
- container.innerHTML = "";
+  const container = document.getElementById("myBookingsList");
+  container.innerHTML = "";
 
- const bookings = myBookings
- .filter(b => b.sessionDate === dateStr)
- .sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
+  const bookings = myBookings
+    .filter(b => b.sessionDate === dateStr)
+    .sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
 
- if (bookings.length === 0) {
- container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) записей нет.</div>`;
- return;
- }
+  if (bookings.length === 0) {
+    container.innerHTML = `<div class="loading">На выбранную дату (${dateStr}) записей нет.</div>`;
+    return;
+  }
 
- bookings.forEach(b => {
- const card = document.createElement("div");
- card.className = "card";
+  bookings.forEach(b => {
+    const card = document.createElement("div");
+    card.className = "card";
 
- let canCancel = b.canCancel && (appConfig.USER_CANCEL !== false);
+    // Подсвечиваем всю карточку в зелёные тона, если статус оплаты "Оплачено"
+    if (b.paymentStatus === "Оплачено") {
+      card.classList.add("paid");
+    }
 
- if (canCancel && appConfig.USER_CANCEL_TIME > 0 && b.sessionDate && b.sessionTime) {
- const sessionStart = new Date(`${b.sessionDate}T${b.sessionTime}`);
- const now = new Date();
- const diffMinutes = (sessionStart - now) / (1000 * 60);
+    let canCancel = b.canCancel && (appConfig.USER_CANCEL !== false);
 
- if (diffMinutes < Number(appConfig.USER_CANCEL_TIME)) {
- canCancel = false;
- }
- }
+    if (canCancel && appConfig.USER_CANCEL_TIME > 0 && b.sessionDate && b.sessionTime) {
+      const sessionStart = new Date(`${b.sessionDate}T${b.sessionTime}`);
+      const now = new Date();
+      const diffMinutes = (sessionStart - now) / (1000 * 60);
 
- card.innerHTML = `
- <div class="card-title">
- <span>${b.section}</span>
- <span class="card-badge badge-status">${b.status}</span>
- </div>
- <div class="card-subtitle">
- ⏰ Время: ${b.sessionTime}<br>
- 👶 Ребёнок: ${b.childName} (${b.childBirthYear} г.р.)<br>
- 💳 Оплата: ${b.paymentStatus}
- </div>
- <div style="font-size: 11px; color: var(--hint-color);">№ брони: ${b.bookingId}</div>
- ${canCancel ? `<button class="btn-cancel" onclick="cancelBooking('${b.bookingId}', '${b.sessionDate}', '${b.sessionTime}')">Отменить запись</button>` : ''}
- `;
+      if (diffMinutes < Number(appConfig.USER_CANCEL_TIME)) {
+        canCancel = false;
+      }
+    }
 
- container.appendChild(card);
- });
+    // Текст "Забронировано" окрашиваем в зелёный класс, остальные варианты сохраняют оранжевый badge-status
+    const statusBadgeClass = (b.status === "Забронировано") ? "badge-status-booked" : "badge-status";
+
+    card.innerHTML = `
+      <div class="card-title">
+        <span>${b.section}</span>
+        <span class="card-badge ${statusBadgeClass}">${b.status}</span>
+      </div>
+      <div class="card-subtitle">
+        ⏰ Время: ${b.sessionTime}<br>
+        👶 Ребёнок: ${b.childName} (${b.childBirthYear} г.р.)<br>
+        💳 Оплата: ${b.paymentStatus}
+      </div>
+      <div style="font-size: 11px; color: var(--hint-color);">№ брони: ${b.bookingId}</div>
+      ${canCancel ? `<button class="btn-cancel" onclick="cancelBooking('${b.bookingId}', '${b.sessionDate}', '${b.sessionTime}')">Отменить запись</button>` : ''}
+    `;
+
+    container.appendChild(card);
+  });
  }
 
  function cancelBooking(bookingId, sessionDate, sessionTime) {
