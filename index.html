@@ -173,13 +173,22 @@
  .card-title { font-weight: bold; font-size: 15px; margin-bottom: 4px; display: flex; justify-content: space-between; }
  .card-subtitle { font-size: 13px; color: var(--hint-color); margin-bottom: 6px; }
 
- /* Бейджи статусов */
- .card-badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 6px; margin-right: 4px; }
- .badge-age { background-color: #e3f2fd; color: #0d47a1; font-weight: bold; }
- .badge-seats { background-color: #e8f5e9; color: #1b5e20; }
- .badge-full { background-color: #ffebee; color: #c62828; }
- .badge-closed { background-color: #eee; color: #666; }
- .badge-status { background-color: #fff3e0; color: #e65100; font-weight: bold; }
+/* Бейджи статусов */
+.card-badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 6px; margin-right: 4px; }
+.badge-age { background-color: #e3f2fd; color: #0d47a1; font-weight: bold; }
+.badge-seats { background-color: #e8f5e9; color: #1b5e20; }
+.badge-full { background-color: #ffebee; color: #c62828; }
+.badge-closed { background-color: #eee; color: #666; }
+.badge-status { background-color: #fff3e0; color: #e65100; font-weight: bold; }
+
+/* Зелёный бейдж специально для статуса "Забронировано" */
+.badge-status-booked { background-color: #e8f5e9; color: #2e7d32; font-weight: bold; }
+
+/* Подсветка карточки брони при статусе "Оплачено" */
+.card.paid {
+  background-color: #f1f8e9;
+  border-color: #aed581;
+}
 
  /* Список участников */
  .participants-toggle {
