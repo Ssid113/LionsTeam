@@ -109,7 +109,7 @@
  background: var(--btn-color); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 4px; white-space: nowrap;
  }
 
- /* Блок статистики */
+ /* Блок статистики и абонементов */
  .stats-card {
  background: var(--secondary-bg);
  border-radius: 10px;
@@ -140,6 +140,32 @@
  border-bottom: 1px dashed rgba(0,0,0,0.08);
  }
  .stats-item:last-child { border-bottom: none; }
+
+ /* Стили таблицы абонементов */
+ .sub-table {
+ width: 100%;
+ border-collapse: collapse;
+ margin-top: 8px;
+ font-size: 12px;
+ }
+ .sub-table th {
+ text-align: left;
+ padding: 6px;
+ background: rgba(0,0,0,0.05);
+ border-bottom: 1px solid rgba(0,0,0,0.1);
+ }
+ .sub-table td {
+ padding: 6px;
+ border-bottom: 1px dashed rgba(0,0,0,0.1);
+ }
+ .sub-summary {
+ font-weight: bold;
+ cursor: pointer;
+ color: var(--btn-color);
+ outline: none;
+ padding: 2px 0;
+ user-select: none;
+ }
 
  /* Карточки занятий */
  .card { background-color: var(--secondary-bg); border-radius: 12px; padding: 12px; margin-bottom: 10px; border: 2px solid transparent; }
@@ -185,7 +211,7 @@
  .btn-submit:disabled { opacity: 0.5; }
  .loading { text-align: center; padding: 20px; color: var(--hint-color); }
  
-.alert-banner {
+ .alert-banner {
  padding: 10px; border-radius: 8px; background: #e8f5e9; color: #1b5e20;
  font-size: 13px; font-weight: bold; margin-bottom: 12px; text-align: center; display: none;
  }
@@ -224,7 +250,7 @@
  </select>
  </div>
  
-<div id="weekCalendar" class="week-grid"></div>
+ <div id="weekCalendar" class="week-grid"></div>
 
  <div id="loadingSchedule" class="loading">Загрузка занятий...</div>
  <div id="slotsList"></div>
@@ -232,7 +258,7 @@
  <div id="bookingForm" class="form-group" style="display: none;">
  <h3 style="margin-bottom: 8px; font-size: 16px;">Данные для записи</h3>
  
-<label>ФИО Клиента / Родителя *</label>
+ <label>ФИО Клиента / Родителя *</label>
  <input type="text" id="clientName" placeholder="Иванов Иван" required>
 
  <label>Номер телефона * (только цифры)</label>
@@ -269,6 +295,9 @@
  <!-- Краткая статистика за месяц (управляется ключом USER_V_STAT) -->
  <div id="monthlyStats" class="stats-card" style="display: none;"></div>
 
+ <!-- ВЫПАДАЮЩАЯ ТАБЛИЦА АБОНЕМЕНТОВ ПОД СТАТИСТИКОЙ (управляется ключом USER_V_SUB) -->
+ <div id="subscriptionsContainer" class="stats-card" style="display: none;"></div>
+
  <div id="loadingMyBookings" class="loading">Загрузка ваших записей...</div>
  <div id="myBookingsList"></div>
  </div>
@@ -279,6 +308,7 @@
 
  let allSessions = [];
  let myBookings = [];
+ let subscriptionsList = []; // Глобальный массив с данными абонементов
  let selectedSession = null;
  let currentChatId = "";
  let userPhone = "";
@@ -299,6 +329,7 @@
   * - USER_V_SIGUP: Отображение списка записавшихся участников (true/false)
   * - USER_MAX_BOOKINGS_DAY: Лимит активных заявок на день (0 - без ограничений)
   * - USER_FIND_BOOKINGS: Поиск броней по номеру телефона (true/false)
+  * - USER_V_SUB: Отображение блока информации об абонементах (true/false)
   */
  let appConfig = {
    USER_V_STAT: true,
@@ -306,7 +337,8 @@
    USER_CANCEL_TIME: 60,
    USER_V_SIGUP: true,
    USER_MAX_BOOKINGS_DAY: 3,
-   USER_FIND_BOOKINGS: true
+   USER_FIND_BOOKINGS: true,
+   USER_V_SUB: true
  };
 
  document.addEventListener("DOMContentLoaded", function() {
@@ -335,6 +367,12 @@
    const statsContainer = document.getElementById("monthlyStats");
    if (statsContainer && appConfig.USER_V_STAT === false) {
      statsContainer.style.display = "none";
+   }
+
+   // [USER_V_SUB]: Скрытие выпадающей таблицы абонементов, если флаг выключен
+   const subContainer = document.getElementById("subscriptionsContainer");
+   if (subContainer && appConfig.USER_V_SUB === false) {
+     subContainer.style.display = "none";
    }
  }
 
@@ -434,10 +472,13 @@
  .then(data => {
  document.getElementById("loadingSchedule").style.display = "none";
  if (data.status === "success") {
- // Обновление конфигурации приложения из ответа Apps Script
  if (data.config) {
  appConfig = Object.assign(appConfig, data.config);
  applyConfigUI();
+ }
+
+ if (data.subscriptions) {
+ subscriptionsList = data.subscriptions;
  }
 
  allSessions = data.sessions;
@@ -482,7 +523,7 @@
  const dayEl = document.createElement("div");
  dayEl.className = `week-day ${dateStr === selectedScheduleDate ? 'selected' : ''}`;
  
-let eventsHtml = "";
+ let eventsHtml = "";
  daySessions.slice(0, 2).forEach(s => {
  eventsHtml += `<div class="week-day-events">${s.title} ${s.time}</div>`;
  });
@@ -560,7 +601,7 @@ let eventsHtml = "";
  if (appConfig.USER_V_SIGUP !== false) {
  if (session.participants && session.participants.length > 0) {
  let items = session.participants.map(p => 
-`<div class="participants-item">👤 ${p.childName} (${p.childBirthYear} г.р.)</div>`
+ `<div class="participants-item">👤 ${p.childName} (${p.childBirthYear} г.р.)</div>`
  ).join("");
 
  participantsHtml = `
@@ -691,7 +732,7 @@ let eventsHtml = "";
  showBanner(`✅ Вы успешно записаны! Номер брони: ${res.bookingId || 'Успешно'}`);
  if (isTelegram && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
  
-selectedSession = null;
+ selectedSession = null;
  document.getElementById("bookingForm").style.display = "none";
  document.getElementById("childName").value = "";
 
@@ -708,24 +749,24 @@ selectedSession = null;
  selectedSession = null;
  document.getElementById("bookingForm").style.display = "none";
  
-loadSchedule(false);
+ loadSchedule(false);
  btn.disabled = false;
  btn.innerText = "Подтвердить запись";
  });
  }
 
- // --- МОИ ЗАПИСИ И СТАТИСТИКА ---
+ // --- МОИ ЗАПИСИ, СТАТИСТИКА И АБОНЕМЕНТЫ ---
  function loadMyBookings() {
- // [USER_FIND_BOOKINGS]: Если поиск отключен администратором — предупреждаем пользователя
  if (appConfig.USER_FIND_BOOKINGS === false) {
  document.getElementById("myBookingsList").innerHTML = `<div class="loading">Просмотр и поиск броней временно отключены администратором.</div>`;
  document.getElementById("monthlyStats").style.display = "none";
+ document.getElementById("subscriptionsContainer").style.display = "none";
  return;
  }
 
  document.getElementById("loadingMyBookings").style.display = "block";
  
-const searchUrl = `${API_URL}?action=getUserBookings&chat_id=${encodeURIComponent(currentChatId)}&phone=${encodeURIComponent(userPhone)}`;
+ const searchUrl = `${API_URL}?action=getUserBookings&chat_id=${encodeURIComponent(currentChatId)}&phone=${encodeURIComponent(userPhone)}`;
 
  fetch(searchUrl)
  .then(res => res.json())
@@ -737,16 +778,20 @@ const searchUrl = `${API_URL}?action=getUserBookings&chat_id=${encodeURIComponen
  applyConfigUI();
  }
 
+ if (data.subscriptions) {
+ subscriptionsList = data.subscriptions;
+ }
+
  myBookings = data.bookings;
  renderMonthCalendar();
  renderMonthlyStats();
+ renderSubscriptions(); // Отрисовка абонементов для текущего месяца
  renderMyBookingsForDate(selectedMyBookingDate);
  }
  });
  }
 
  function searchBookingsByPhone() {
- // [USER_FIND_BOOKINGS]: Запрет выполнения поиска по кнопке
  if (appConfig.USER_FIND_BOOKINGS === false) {
  alert("Поиск броней по номеру телефона отключен администратором.");
  return;
@@ -801,7 +846,7 @@ const searchUrl = `${API_URL}?action=getUserBookings&chat_id=${encodeURIComponen
  const dayEl = document.createElement("div");
  dayEl.className = `month-day ${hasBooking ? 'has-booking' : ''} ${dateStr === selectedMyBookingDate ? 'selected' : ''}`;
  
-dayEl.innerHTML = `
+ dayEl.innerHTML = `
  <div>${day}</div>
  ${hasBooking ? `<div class="booking-badge">${activeBookings.length} зап.</div>` : ''}
  `;
@@ -848,7 +893,7 @@ dayEl.innerHTML = `
  const sec = b.section || "Тренировка";
  const price = Number(b.price) || 1500;
  
-if (!statsMap[sec]) {
+ if (!statsMap[sec]) {
  statsMap[sec] = { count: 0, sum: 0 };
  }
  statsMap[sec].count += 1;
@@ -889,10 +934,69 @@ if (!statsMap[sec]) {
  statsContainer.style.display = "block";
  }
 
+ /**
+  * [USER_V_SUB]: Отрисовка выпадающей таблицы абонементов за выбранный в календаре месяц и год
+  */
+ function renderSubscriptions() {
+ const container = document.getElementById("subscriptionsContainer");
+ if (!container) return;
+
+ // Если функция отключена в настройках интеграции
+ if (appConfig.USER_V_SUB === false) {
+ container.style.display = "none";
+ return;
+ }
+
+ const year = currentMonthDate.getFullYear();
+ const month = currentMonthDate.getMonth() + 1; // В JS месяцы 0-11, а в таблице 1-12
+
+ // Фильтрация записей только под выбранный месяц и год
+ const filteredSubs = subscriptionsList.filter(s => 
+ Number(s.year) === year && Number(s.month) === month
+ );
+
+ if (filteredSubs.length === 0) {
+ container.style.display = "none";
+ return;
+ }
+
+ const monthName = currentMonthDate.toLocaleDateString('ru-RU', { month: 'long' });
+
+ let rowsHtml = filteredSubs.map(s => `
+ <tr>
+ <td><strong>${s.section}</strong></td>
+ <td style="text-align: center;">${s.count} зан.</td>
+ <td style="text-align: right; font-weight: bold;">${Number(s.price).toLocaleString('ru-RU')} ₽</td>
+ </tr>
+ `).join("");
+
+ container.innerHTML = `
+ <details style="width: 100%;">
+ <summary class="sub-summary">
+ 💳 Информация об абонементах (${monthName} ${year}) ▼
+ </summary>
+ <table class="sub-table">
+ <thead>
+ <tr>
+ <th>Направление / Секция</th>
+ <th style="text-align: center;">Занятий</th>
+ <th style="text-align: right;">Стоимость</th>
+ </tr>
+ </thead>
+ <tbody>
+ ${rowsHtml}
+ </tbody>
+ </table>
+ </details>
+ `;
+ container.style.display = "block";
+ }
+
  function changeMonth(offset) {
  currentMonthDate.setMonth(currentMonthDate.getMonth() + offset);
  renderMonthCalendar();
  renderMonthlyStats();
+ renderSubscriptions(); // Перерисовка абонементов при смене месяца
  }
 
  function renderMyBookingsForDate(dateStr) {
@@ -912,10 +1016,8 @@ if (!statsMap[sec]) {
  const card = document.createElement("div");
  card.className = "card";
 
- // [USER_CANCEL]: Флаг разрешения отмены из глобальных настроек
  let canCancel = b.canCancel && (appConfig.USER_CANCEL !== false);
 
- // [USER_CANCEL_TIME]: Проверка доступного времени до тренировки (в минутах)
  if (canCancel && appConfig.USER_CANCEL_TIME > 0 && b.sessionDate && b.sessionTime) {
  const sessionStart = new Date(`${b.sessionDate}T${b.sessionTime}`);
  const now = new Date();
@@ -945,13 +1047,11 @@ if (!statsMap[sec]) {
  }
 
  function cancelBooking(bookingId, sessionDate, sessionTime) {
- // [USER_CANCEL]: Проверка разрешения отмены на клиенте
  if (appConfig.USER_CANCEL === false) {
  alert("Отмена бронирования отключена администратором.");
  return;
  }
 
- // [USER_CANCEL_TIME]: Проверка оставшегося времени до начала перед отправкой запроса
  if (appConfig.USER_CANCEL_TIME > 0 && sessionDate && sessionTime) {
  const sessionStart = new Date(`${sessionDate}T${sessionTime}`);
  const now = new Date();
@@ -981,7 +1081,7 @@ if (!statsMap[sec]) {
  let res;
  try { res = JSON.parse(textData); } catch(e) { res = { status: "success" }; }
  
-if (res.status === "success") {
+ if (res.status === "success") {
  showBanner("✅ Запись успешно отменена.");
  loadMyBookings();
  loadSchedule(false);
