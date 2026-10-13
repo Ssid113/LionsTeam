@@ -347,7 +347,8 @@
    USER_V_SIGUP: true,
    USER_MAX_BOOKINGS_DAY: 3,
    USER_FIND_BOOKINGS: true,
-   USER_V_SUB: true
+   USER_V_SUB: true,
+   USER_BOOKINGS_TIME: 0
  };
 
  document.addEventListener("DOMContentLoaded", function() {
@@ -565,96 +566,109 @@
  renderWeekCalendar();
  }
 
- function renderScheduleForDate(dateStr) {
- const container = document.getElementById("slotsList");
- container.innerHTML = "";
+function renderScheduleForDate(dateStr) {
+  const container = document.getElementById("slotsList");
+  container.innerHTML = "";
 
- const sessions = allSessions
- .filter(s => {
- if (s.date !== dateStr) return false;
- if (selectedBirthYearFilter !== "") {
- const year = Number(selectedBirthYearFilter);
- if (year < s.yearFrom || year > s.yearTo) return false;
- }
- return true;
- })
- .sort((a, b) => a.time.localeCompare(b.time));
+  const sessions = allSessions
+    .filter(s => {
+      if (s.date !== dateStr) return false;
+      if (selectedBirthYearFilter !== "") {
+        const year = Number(selectedBirthYearFilter);
+        if (year < s.yearFrom || year > s.yearTo) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a.time.localeCompare(b.time));
 
- if (sessions.length === 0) {
- const filterMsg = selectedBirthYearFilter ? ` для ${selectedBirthYearFilter} г.р.` : '';
- container.innerHTML = `<div class="loading">На выбранную дату (${dateStr})${filterMsg} нет доступных занятий.</div>`;
- document.getElementById("bookingForm").style.display = "none";
- return;
- }
+  if (sessions.length === 0) {
+    const filterMsg = selectedBirthYearFilter ? ` для ${selectedBirthYearFilter} г.р.` : '';
+    container.innerHTML = `<div class="loading">На выбранную дату (${dateStr})${filterMsg} нет доступных занятий.</div>`;
+    document.getElementById("bookingForm").style.display = "none";
+    return;
+  }
 
- sessions.forEach(session => {
- const card = document.createElement("div");
- card.className = "card";
- if (selectedSession && selectedSession.id === session.id) {
- card.classList.add("selected");
- }
+  const now = new Date();
+  const limitMinutes = Number(appConfig.USER_BOOKINGS_TIME) || 0;
 
- let badgeClass = "badge-seats";
- let statusText = `Свободно: ${session.freeSeats}`;
+  sessions.forEach(session => {
+    const card = document.createElement("div");
+    card.className = "card";
+    if (selectedSession && selectedSession.id === session.id) {
+      card.classList.add("selected");
+    }
 
- if (session.status === "Запись закрыта" || session.isPast) {
- badgeClass = "badge-closed";
- statusText = "Запись закрыта";
- } else if (session.status === "Мест нет" || session.freeSeats <= 0) {
- badgeClass = "badge-full";
- statusText = "Мест нет";
- }
+    // Проверка лимита времени закрытия записи (USER_BOOKINGS_TIME)
+    let isClosedByTime = false;
+    if (session.date && session.time) {
+      const sessionStart = new Date(`${session.date}T${session.time}`);
+      const diffMinutes = (sessionStart - now) / (1000 * 60);
+      if (diffMinutes < limitMinutes) {
+        isClosedByTime = true;
+      }
+    }
 
- let participantsHtml = "";
- // [USER_V_SIGUP]: Отрисовка списка участников производится ТОЛЬКО при включенном ключе
- if (appConfig.USER_V_SIGUP !== false) {
- if (session.participants && session.participants.length > 0) {
- let items = session.participants.map(p => 
- `<div class="participants-item">👤 ${p.childName} (${p.childBirthYear} г.р.)</div>`
- ).join("");
+    let badgeClass = "badge-seats";
+    let statusText = `Свободно: ${session.freeSeats}`;
 
- participantsHtml = `
- <div class="participants-toggle" onclick="toggleParticipants('part-${session.id}', event)">
- 👥 Записались (${session.participants.length} чел.) ▼
- </div>
- <div id="part-${session.id}" class="participants-list">
- ${items}
- </div>
- `;
- } else {
- participantsHtml = `<div style="font-size: 11px; color: var(--hint-color); margin-top: 6px;">👥 Пока никто не записан</div>`;
- }
- }
+    if (session.status === "Запись закрыта" || session.isPast || isClosedByTime) {
+      badgeClass = "badge-closed";
+      statusText = "Запись закрыта";
+    } else if (session.status === "Мест нет" || session.freeSeats <= 0) {
+      badgeClass = "badge-full";
+      statusText = "Мест нет";
+    }
 
- card.innerHTML = `
- <div class="card-title">
- <span>${session.title}</span>
- <span>${session.price > 0 ? session.price + ' ₽' : 'Бесплатно'}</span>
- </div>
- <div class="card-subtitle">
- ⏰ ${session.time} (${session.duration}) | 👨‍🏫 ${session.coach}<br>
- 📍 ${session.location}
- </div>
- <div>
- <span class="card-badge badge-age">${session.yearFrom}–${session.yearTo} г.р.</span>
- <span class="card-badge ${badgeClass}">${statusText}</span>
- </div>
- ${participantsHtml}
- `;
+    let participantsHtml = "";
+    if (appConfig.USER_V_SIGUP !== false) {
+      if (session.participants && session.participants.length > 0) {
+        let items = session.participants.map(p => 
+          `<div class="participants-item">👤 ${p.childName} (${p.childBirthYear} г.р.)</div>`
+        ).join("");
 
- if (session.status === "Открыта запись" && !session.isPast && session.freeSeats > 0) {
- card.onclick = (e) => {
- if (!e.target.classList.contains('participants-toggle')) {
- selectSlot(session, card);
- }
- };
- } else {
- card.style.opacity = "0.85";
- }
+        participantsHtml = `
+          <div class="participants-toggle" onclick="toggleParticipants('part-${session.id}', event)">
+            👥 Записались (${session.participants.length} чел.) ▼
+          </div>
+          <div id="part-${session.id}" class="participants-list">
+            ${items}
+          </div>
+        `;
+      } else {
+        participantsHtml = `<div style="font-size: 11px; color: var(--hint-color); margin-top: 6px;">👥 Пока никто не записан</div>`;
+      }
+    }
 
- container.appendChild(card);
- });
- }
+    card.innerHTML = `
+      <div class="card-title">
+        <span>${session.title}</span>
+        <span>${session.price > 0 ? session.price + ' ₽' : 'Бесплатно'}</span>
+      </div>
+      <div class="card-subtitle">
+        ⏰ ${session.time} (${session.duration}) | 👨‍🏫 ${session.coach}<br>
+        📍 ${session.location}
+      </div>
+      <div>
+        <span class="card-badge badge-age">${session.yearFrom}–${session.yearTo} г.р.</span>
+        <span class="card-badge ${badgeClass}">${statusText}</span>
+      </div>
+      ${participantsHtml}
+    `;
+
+    // Запись доступна только если статус открыт, занятие не в прошлом, есть места и время до начала не превысило лимит
+    if (session.status === "Открыта запись" && !session.isPast && !isClosedByTime && session.freeSeats > 0) {
+      card.onclick = (e) => {
+        if (!e.target.classList.contains('participants-toggle')) {
+          selectSlot(session, card);
+        }
+      };
+    } else {
+      card.style.opacity = "0.85";
+    }
+
+    container.appendChild(card);
+  });
+}
 
  function toggleParticipants(elementId, event) {
  event.stopPropagation();
